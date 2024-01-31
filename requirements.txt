@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+aioredis
+
+streamlit
+streamlit_authenticator
