@@ -1,68 +1,59 @@
 from fastapi import FastAPI, HTTPException
-from typing import Optional
-from pydantic import BaseModel
-import redis
-import json
+from pymongo import MongoClient
+
+from models import *
+
 
 app = FastAPI()
-rc = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
-class TestResults(BaseModel):
-    username: str
-    answers: dict
-    test_started: bool  # Added "test_started" field
+MONGO_DB_URI = "mongodb://localhost:27017"
+client = MongoClient( MONGO_DB_URI )
+db = client["speedlearn"]
 
 
+# User endpoints
+@app.get("/users", response_model=List[User])
+async def read_users():
+    users = list(db.users.find())
+    return users
 
-@app.post("/tests/")
-async def create_test(test: TestResults):
-    """
-    Create a new test.
-
-    Args:
-        test (TestResults): The test object containing the test details.
-
-    Returns:
-        dict: A dictionary with a message indicating the success of the operation.
-    """
-
-    test.test_started = False  # Set "test_started" to False initially
-    rc.set(test.username, json.dumps(test.dict()))
-    return {'message': 'test added successfully'}
+@app.post("/users", response_model=User)
+async def create_user(user: UserBase):
+    user_id = db.users.insert_one(user.dict()).inserted_id
+    return {**user.dict(), "id": str(user_id)}
 
 
+# Question endpoints
+@app.get("/questions", response_model=List[QuestionBase])
+async def read_questions():
+    questions = list(db.questions.find())
+    return questions
+
+@app.post("/questions", response_model=Question)
+def create_question(question: QuestionBase):
+    question_id = db.questions.insert_one(question.dict()).inserted_id
+    return {**question.dict(), "id": str(question_id)}
 
 
-@app.get("/tests/")
-async def get_all_tests():
-    """
-    Retrieve all tests from the Redis cache.
-
-    Returns:
-        dict: A dictionary containing all tests.
-    """
-
-    keys = rc.keys('*')
-    tests = {key: json.loads(rc.get(key)) for key in keys}
+# Test endpoints
+@app.get("/tests", response_model=List[Test])
+async def read_tests():
+    tests = list(db.tests.find())
     return tests
 
+@app.post("/tests", response_model=Test)
+async def create_test(test: TestBase):
+    test_id = db.tests.insert_one(test.dict()).inserted_id
+    return {**test.dict(), "id": str(test_id)}
 
 
-@app.get("/tests/{username}")
-async def get_test(username: str):
-    user_test = rc.get(username)
-    if user_test:
-        return {username: json.loads(user_test)}
-    raise HTTPException(status_code=404, detail="Test not found")
+# UserTest endpoints
+@app.get("/usertests", response_model=List[UserTest])
+async def read_user_tests():
+    user_tests = list(db.usertests.find())
+    return user_tests
 
-
-
-@app.post("/tests/{username}/answers/")
-async def submit_answer(username: str, answer: str):
-    user_test = rc.get(username)
-    if user_test:
-        test = json.loads(user_test)
-        test['answers'] = answer
-        rc.set(username, json.dumps(test))
-        return {'message': 'Answer submitted successfully'}
-    raise HTTPException(status_code=404, detail="Test not found")
+@app.post("/usertests", response_model=UserTest)
+async def create_user_test(user_test: UserTestBase):
+    user_test_id = db.usertests.insert_one(user_test.dict()).inserted_id
+    return {**user_test.dict(), "id": str(user_test_id)}

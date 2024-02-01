@@ -1,6 +1,19 @@
+import os
+import time
+import json
 import requests
 
 import streamlit as st
+from streamlit_cookies_manager import EncryptedCookieManager
+
+
+
+
+# This should be on top of your script
+cookies = EncryptedCookieManager(
+    # prefix="masterful/streamlit-cookies-manager/",
+    password=os.environ.get("COOKIES_PASSWORD", "alwayscheckthesourcecodeyoufool"),
+)
 
 
 # @app.post("/tests/{username}/answers/")
@@ -26,6 +39,17 @@ def submit_answer():
         raise requests.HTTPError(f"Failed to submit answer: {res.json()}")
 
 
+def get_available_tests():
+    res = requests.get('http://localhost:8000/tests/')
+    if res.status_code == 200:
+        if res.content:
+            return res.json()
+        else:
+            return []
+    else:
+        raise requests.HTTPError(f"Failed to get available tests: {res.json()}")
+    # return res.json()
+
 
 class TestState:
     def __init__(self, username):
@@ -35,31 +59,115 @@ class TestState:
 
 
 
-def init():
-    st.write(st.session_state)
+def login_page():
+    # st.write(st.session_state)
     if 'test_state' in st.session_state:
         return True
-    
+
     st.write('# Hello, Learner!')
-    st.text_input('Username', key='username')
-    # st.chat_input('Username', key='username')
-    if st.session_state.username:
-        st.session_state.test_state = TestState(st.session_state.username)
+    username = st.text_input('Username', key='username')
+    if username:
+        st.session_state.test_state = TestState(username)
+        cookies['tester_username'] = username
+        cookies.save()
         st.rerun()
 
 
-    return False
 
-
+def logout():
+    # cookies.clear()
+    del cookies['tester_username']
+    cookies.save()
+    st.session_state.clear()
+    st.rerun()
 
 
 
 def main():
-    st.set_page_config(page_title='Quiz App', page_icon='🧠')
+    while not cookies.ready():
+        time.sleep(0.01)
 
-    if not init():
+    st.write("Current cookies:", cookies)
+
+    if 'tester_username' in cookies:
+        st.session_state.username = cookies['tester_username']
+    else:
+        login_page()
         st.stop()
+    
+    st.button("logout", on_click=logout)
 
+    if st.session_state.username == "teacher":
+        teacher_page()
+    else:
+        student_page()
+
+
+
+def get_all_questions():
+    res = requests.get('http://localhost:8000/questions/')
+    if res.status_code == 200:
+        try:
+            return res.json()
+        except json.JSONDecodeError:
+            return []
+    else:
+        raise requests.HTTPError(f"Failed to get questions: {res.json()}")
+    
+    
+
+def teacher_page():
+    st.write("---")
+    # tests = get_available_tests()
+    # st.write('tests:')
+    # st.write(tests)
+
+    st.write("## All questions (teacher's view)")
+
+    all_questions = get_all_questions()
+    for q in all_questions:
+        st.write(f"### {q['question']}")
+        # st.write(q['options'])
+        for i, option in enumerate(q['options']):
+            # st.write(f"{i+1}. {option}")
+            st.write(f"{chr(ord('A') + i)}. `{option}`")
+
+        st.write(f"answer: `{q['correct_answer']}`")
+        st.write(f"source: {q['source_document']}")
+        st.write(f"subject: {q['subject']}")
+
+        st.write('---')
+
+    st.write('---')
+    st.write('## Create a new question')
+
+    with st.form(key='new_question_form'):
+        new_question = st.text_input('Question')
+        new_options = []
+        for i in range(5):
+            option = st.text_input(f'Option {i+1}')
+            new_options.append(option)
+        new_answer = st.text_input('Answer')
+
+        submit_button = st.form_submit_button('Submit')
+
+        if submit_button:
+            question_data = {
+                'question': new_question,
+                'options': new_options,
+                'correct_answer': new_answer,
+                'subject': 'math',
+                'source_document': 'test'
+            }
+            res = requests.post('http://localhost:8000/questions/', json=question_data)
+            if res.status_code == 200:
+                st.write('Question submitted successfully')
+            else:
+                st.write('Failed to submit question:', res.json())
+
+
+def student_page():
+    # st.set_page_config(page_title='Quiz App', page_icon='🧠')
     st.caption(f"`{st.session_state.username}`")
     st.write(f'# Hello, {st.session_state.username}!')
 
@@ -71,6 +179,11 @@ def main():
     if submit := st.button('Submit'):
         response = submit_answer(st.session_state.username, st.session_state.answer_selection)
         st.write(response.json())
+
+
+
+
+
 
 
 if __name__ == '__main__':
