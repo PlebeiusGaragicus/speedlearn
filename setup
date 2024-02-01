@@ -1,0 +1,19 @@
+```python
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+# ensure homebrew is installed
+```sh
+brew update
+brew tap mongodb/brew
+brew install mongodb-community
+
+# start it
+brew services start mongodb/brew/mongodb-community
+
+# check that it's running
+ps aux | grep -v grep | grep mongod
+```

@@ -1,5 +1,8 @@
 from pydantic import BaseModel
 from typing import Optional, List
+from enum import Enum
+from pydantic import BaseModel
+from typing import Optional, List
 
 # Pydantic models
 class UserBase(BaseModel):
@@ -8,9 +11,16 @@ class UserBase(BaseModel):
 class User(UserBase):
     id: str
 
+class QuestionType(str, Enum):
+    TrueFalse = "True/False"
+    Checkbox = "Checkbox"
+    Radio = "Radio"
+    Freeform = "Freeform"
+
 class QuestionBase(BaseModel):
+    question_type: QuestionType
     question: str
-    options: List[str]
+    choices: Optional[List[str]] = None  # For "Checkbox" and "Radio" types, this is a list of choices
     correct_answer: str
     subject: str
     source_document: str

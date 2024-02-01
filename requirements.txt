@@ -5,5 +5,6 @@ pymongo
 
 streamlit
 streamlit_authenticator
+streamlit_modal
 # streamlit_cookies_manager
 git+https://github.com/PlebeiusGaragicus/streamlit-cookies-manager.git

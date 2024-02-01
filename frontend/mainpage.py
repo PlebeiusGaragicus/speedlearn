@@ -5,8 +5,14 @@ import requests
 
 import streamlit as st
 from streamlit_cookies_manager import EncryptedCookieManager
+from streamlit_modal import Modal
 from bson import ObjectId
 
+# add parent directory to path
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from backend.models import *
 
 
 
@@ -84,29 +90,9 @@ def logout():
 
 
 
-def main():
-    while not cookies.ready():
-        time.sleep(0.01)
-
-    st.write("Current cookies:", cookies)
-
-    if 'tester_username' in cookies:
-        st.session_state.username = cookies['tester_username']
-    else:
-        login_page()
-        st.stop()
-    
-    st.button("logout", on_click=logout)
-
-    if st.session_state.username == "teacher":
-        teacher_page()
-    else:
-        student_page()
-
-
-
 def get_all_questions():
     res = requests.get('http://localhost:8000/questions/')
+    st.write(res)
     if res.status_code == 200:
         print(res.json())
         try:
@@ -124,39 +110,82 @@ def delete_question(question_id):
         return {'message': 'Question deleted successfully'}
     else:
         raise requests.HTTPError(f"Failed to delete question: {res.json()}")
-    
+
+
+def run_TF_modal():
+    # with st.expander('Create a new question', expanded=False):
+    with st.form(key='new_question_form'):
+        new_question = st.text_input('Question')
+        # new_options = ['True', 'False']
+        new_options = ["True", "False", "Can't Answer"]
+        st.radio('Answer', new_options, key="new_answer")
+
+        submit_button = st.form_submit_button('Submit')
+
+        if submit_button:
+            question_data = {
+                'question_type': QuestionType.TrueFalse,
+                'question': new_question,
+                'choices': ["True", "False", "Can't Answer"],
+                'correct_answer': st.session_state.new_answer,
+                'subject': 'math',
+                'source_document': 'test'
+            }
+            res = requests.post('http://localhost:8000/questions/', json=question_data)
+            if res.status_code == 200:
+                st.write('Question submitted successfully')
+            else:
+                st.write('Failed to submit question:', res.json())
+
+def run_MultiSelect_modal():
+    # with st.expander('Create a new question', expanded=False):
+    with st.form(key='new_question_form'):
+        new_question = st.text_input('Question')
+        new_options = []
+        for i in range(5):
+            option = st.text_input(f'Option {i+1}')
+            new_options.append(option)
+        new_answer = st.text_input('Answer')
+
+        submit_button = st.form_submit_button('Submit')
+
+        if submit_button:
+            question_data = {
+                'question': new_question,
+                'options': new_options,
+                'correct_answer': new_answer,
+                'subject': 'math',
+                'source_document': 'test'
+            }
+            res = requests.post('http://localhost:8000/questions/', json=question_data)
+            if res.status_code == 200:
+                st.write('Question submitted successfully')
+            else:
+                st.write('Failed to submit question:', res.json())
+
 
 def teacher_page():
     # st.write("---")
 
-    with st.expander('Create a new question', expanded=False):
-        with st.form(key='new_question_form'):
-            new_question = st.text_input('Question')
-            new_options = []
-            for i in range(5):
-                option = st.text_input(f'Option {i+1}')
-                new_options.append(option)
-            new_answer = st.text_input('Answer')
+    st.write("## Teacher's Dashboard")
 
-            submit_button = st.form_submit_button('Submit')
+    modal = Modal(key="New True/False question",title="TF_modal")
+    if st.button("True/False"):
+        modal.open()
 
-            if submit_button:
-                question_data = {
-                    'question': new_question,
-                    'options': new_options,
-                    'correct_answer': new_answer,
-                    'subject': 'math',
-                    'source_document': 'test'
-                }
-                res = requests.post('http://localhost:8000/questions/', json=question_data)
-                if res.status_code == 200:
-                    st.write('Question submitted successfully')
-                else:
-                    st.write('Failed to submit question:', res.json())
+    if modal.is_open():
+        with modal.container():
+            run_TF_modal()
 
+
+
+    # st.stop()
     st.write("## All questions (teacher's view)")
 
     all_questions = get_all_questions()
+    st.write(f"Total questions: {len(all_questions)}")
+    st.write(all_questions)
+
     for q in all_questions:
         st.write(f"### {q['question']}")
         st.caption(f"id: {q['id']}")
@@ -196,5 +225,28 @@ def student_page():
 
 
 
-if __name__ == '__main__':
-    main()
+def mainpage():
+    waiting = st.empty()
+    waiting.write("waiting for cookies")
+    while not cookies.ready():
+        time.sleep(0.01)
+    waiting.empty()
+
+    st.write("Current cookies:", cookies)
+
+    if 'tester_username' in cookies:
+        st.session_state.username = cookies['tester_username']
+    else:
+        login_page()
+        st.stop()
+    
+    st.button("logout", on_click=logout)
+
+    if st.session_state.username == "teacher":
+        teacher_page()
+    else:
+        student_page()
+
+
+if __name__ == "__main__":
+    mainpage()
