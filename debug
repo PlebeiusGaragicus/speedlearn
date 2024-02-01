@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# capture output and ensure it's "PONG"
+function wait_for_backend {
+  while true; do
+    response=$(redis-cli ping)
+    if [ "$response" == "PONG" ]; then
+      break
+    fi
+    echo "Waiting for backend... IS YOUR REDIS RUNNING?!?!!"
+    echo "brew services start redis"
+    sleep 1
+  done
+}
+
+wait_for_backend
+
+
+
+# Define a function to be called when script exits
+cleanup() {
+    echo "Cleaning up..."
+    pkill -P $$
+}
+
+trap cleanup EXIT
+
+
+source venv/bin/activate
+
+# start backend
+cd backend
+uvicorn main:app --reload
+cd ..
+
+# start frontend
+cd frontend
+args="--server.address 0.0.0.0"
+streamlit run $args main.py
+cd ..
