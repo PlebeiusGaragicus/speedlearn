@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pymongo import MongoClient
 
 from models import *
+from bson import ObjectId
 
 
 app = FastAPI()
@@ -24,10 +25,33 @@ async def create_user(user: UserBase):
 
 
 # Question endpoints
-@app.get("/questions", response_model=List[QuestionBase])
+@app.get("/questions", response_model=List[Question])
 async def read_questions():
     questions = list(db.questions.find())
-    return questions
+    for q in questions:
+        print(q)
+    
+    # return questions
+    return [{**question, "id": str(question["_id"])} for question in questions]
+
+
+
+# @app.get("/questions/{question_id}", response_model=Question)
+# async def read_question(question_id: str):
+#     question = db.questions.find_one({"_id": ObjectId(question_id)})
+#     if question is None:
+#         raise HTTPException(status_code=404, detail="Question not found")
+#     return {**question, "id": str(question["_id"])}
+#     # return question
+
+@app.delete("/questions/{question_id}", response_model=Question)
+async def delete_question(question_id: str):
+    question = db.questions.find_one({"_id": ObjectId(question_id)})
+    if question is None:
+        raise HTTPException(status_code=404, detail="Question not found")
+    db.questions.delete_one({"_id": ObjectId(question_id)})
+    return {**question, "id": str(question["_id"])}
+
 
 @app.post("/questions", response_model=Question)
 def create_question(question: QuestionBase):

@@ -5,6 +5,7 @@ import requests
 
 import streamlit as st
 from streamlit_cookies_manager import EncryptedCookieManager
+from bson import ObjectId
 
 
 
@@ -107,63 +108,72 @@ def main():
 def get_all_questions():
     res = requests.get('http://localhost:8000/questions/')
     if res.status_code == 200:
+        print(res.json())
         try:
             return res.json()
         except json.JSONDecodeError:
             return []
     else:
         raise requests.HTTPError(f"Failed to get questions: {res.json()}")
-    
+
+
+def delete_question(question_id):
+    # question_id = ObjectId(question_id)
+    res = requests.delete(f'http://localhost:8000/questions/{question_id}')
+    if res.status_code == 200:
+        return {'message': 'Question deleted successfully'}
+    else:
+        raise requests.HTTPError(f"Failed to delete question: {res.json()}")
     
 
 def teacher_page():
-    st.write("---")
-    # tests = get_available_tests()
-    # st.write('tests:')
-    # st.write(tests)
+    # st.write("---")
+
+    with st.expander('Create a new question', expanded=False):
+        with st.form(key='new_question_form'):
+            new_question = st.text_input('Question')
+            new_options = []
+            for i in range(5):
+                option = st.text_input(f'Option {i+1}')
+                new_options.append(option)
+            new_answer = st.text_input('Answer')
+
+            submit_button = st.form_submit_button('Submit')
+
+            if submit_button:
+                question_data = {
+                    'question': new_question,
+                    'options': new_options,
+                    'correct_answer': new_answer,
+                    'subject': 'math',
+                    'source_document': 'test'
+                }
+                res = requests.post('http://localhost:8000/questions/', json=question_data)
+                if res.status_code == 200:
+                    st.write('Question submitted successfully')
+                else:
+                    st.write('Failed to submit question:', res.json())
 
     st.write("## All questions (teacher's view)")
 
     all_questions = get_all_questions()
     for q in all_questions:
         st.write(f"### {q['question']}")
+        st.caption(f"id: {q['id']}")
         # st.write(q['options'])
         for i, option in enumerate(q['options']):
             # st.write(f"{i+1}. {option}")
-            st.write(f"{chr(ord('A') + i)}. `{option}`")
+            if q['correct_answer'] == option:
+                st.write(f"`{chr(ord('A') + i)}:` :rainbow[{option}]")
+            else:
+                st.write(f"`{chr(ord('A') + i)}:` {option}")
 
-        st.write(f"answer: `{q['correct_answer']}`")
+        # st.write(f"answer: `{q['correct_answer']}`")
         st.write(f"source: {q['source_document']}")
         st.write(f"subject: {q['subject']}")
-
+        st.button(f"Delete question {q['id']}", on_click=delete_question, args=(q['id'],))
+        # st.write(q)
         st.write('---')
-
-    st.write('---')
-    st.write('## Create a new question')
-
-    with st.form(key='new_question_form'):
-        new_question = st.text_input('Question')
-        new_options = []
-        for i in range(5):
-            option = st.text_input(f'Option {i+1}')
-            new_options.append(option)
-        new_answer = st.text_input('Answer')
-
-        submit_button = st.form_submit_button('Submit')
-
-        if submit_button:
-            question_data = {
-                'question': new_question,
-                'options': new_options,
-                'correct_answer': new_answer,
-                'subject': 'math',
-                'source_document': 'test'
-            }
-            res = requests.post('http://localhost:8000/questions/', json=question_data)
-            if res.status_code == 200:
-                st.write('Question submitted successfully')
-            else:
-                st.write('Failed to submit question:', res.json())
 
 
 def student_page():
