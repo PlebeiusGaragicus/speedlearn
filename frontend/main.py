@@ -26,6 +26,7 @@ def submit_answer():
         raise requests.HTTPError(f"Failed to submit answer: {res.json()}")
 
 
+
 class TestState:
     def __init__(self, username):
         self.username = username
@@ -35,18 +36,32 @@ class TestState:
 
 
 def init():
+    st.write(st.session_state)
+    if 'test_state' in st.session_state:
+        return True
+    
+    st.write('# Hello, Learner!')
     st.text_input('Username', key='username')
-
-    if 'test_state' not in st.session_state:
+    # st.chat_input('Username', key='username')
+    if st.session_state.username:
         st.session_state.test_state = TestState(st.session_state.username)
+        st.rerun()
+
+
+    return False
+
 
 
 
 
 def main():
     st.set_page_config(page_title='Quiz App', page_icon='🧠')
-    st.write('# Hello, Learners!')
-    st.caption(f"{st.session_state.username}, welcome to the quiz app. Let's get started!")
+
+    if not init():
+        st.stop()
+
+    st.caption(f"`{st.session_state.username}`")
+    st.write(f'# Hello, {st.session_state.username}!')
 
     st.write('---')
 
